@@ -9,11 +9,10 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextPar
 fn main() {
     let model_path = std::env::args()
         .nth(1)
-        .expect("Please specify path to model");
+        .expect("Please specify path to model as argument 1");
     let wav_path = std::env::args()
         .nth(2)
-        .expect("Please specify path to wav file");
-    let language = "en";
+        .expect("Please specify path to wav file as argument 2");
 
     let samples: Vec<i16> = hound::WavReader::open(wav_path)
         .unwrap()
@@ -24,15 +23,24 @@ fn main() {
     // load a context and model
     let ctx = WhisperContext::new_with_params(&model_path, WhisperContextParameters::default())
         .expect("failed to load model");
-
+    // create a state attached to the model
     let mut state = ctx.create_state().expect("failed to create state");
 
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    // the sampling strategy will determine how accurate your final output is going to be
+    // typically BeamSearch is more accurate at the cost of significantly increased CPU time
+    let mut params = FullParams::new(SamplingStrategy::BeamSearch {
+        // whisper.cpp defaults to a beam size of 5, a reasonable default
+        beam_size: 5,
+        // this parameter is currently unused but defaults to -1.0
+        patience: -1.0,
+    });
 
-    // and set the language to translate to to english
-    params.set_language(Some(&language));
+    // and set the language to translate to as english
+    params.set_language(Some("en"));
 
     // we also explicitly disable anything that prints to stdout
+    // despite all of this you will still get things printing to stdout,
+    // be prepared to deal with it
     params.set_print_special(false);
     params.set_print_progress(false);
     params.set_print_realtime(false);
@@ -42,7 +50,6 @@ fn main() {
     // some utilities exist for this
     // note that you don't need to use these, you can do it yourself or any other way you want
     // these are just provided for convenience
-    // SIMD variants of these functions are also available, but only on nightly Rust: see the docs
     let mut inter_samples = vec![Default::default(); samples.len()];
 
     whisper_rs::convert_integer_to_float_audio(&samples, &mut inter_samples)
@@ -51,25 +58,20 @@ fn main() {
         .expect("failed to convert audio data");
 
     // now we can run the model
-    // note the key we use here is the one we created above
     state
         .full(params, &samples[..])
         .expect("failed to run model");
 
     // fetch the results
-    let num_segments = state
-        .full_n_segments()
-        .expect("failed to get number of segments");
-    for i in 0..num_segments {
-        let segment = state
-            .full_get_segment_text(i)
-            .expect("failed to get segment");
-        let start_timestamp = state
-            .full_get_segment_t0(i)
-            .expect("failed to get segment start timestamp");
-        let end_timestamp = state
-            .full_get_segment_t1(i)
-            .expect("failed to get segment end timestamp");
-        println!("[{} - {}]: {}", start_timestamp, end_timestamp, segment);
+    for segment in state.as_iter() {
+        println!(
+            "[{} - {}]: {}",
+            // these timestamps are in centiseconds (10s of milliseconds)
+            segment.start_timestamp(),
+            segment.end_timestamp(),
+            // this default Display implementation will result in any invalid UTF-8
+            // being converted into the Unicode replacement character, U+FFFD
+            segment
+        );
     }
 }

@@ -1,6 +1,11 @@
 #![allow(clippy::uninlined_format_args)]
 #![cfg_attr(test, feature(test))]
 
+//! Most users will be looking for nothing more than [`WhisperState::full`] to run a full transcription pipeline.
+//!
+//! You can get a [`WhisperState`] by first creating a [`WhisperContext`] using [`WhisperContext::new_with_params`],
+//! and then calling [`WhisperContext::create_state`].
+
 #[cfg(feature = "vulkan")]
 pub mod vulkan;
 
@@ -15,6 +20,7 @@ mod whisper_grammar;
 mod whisper_logging_hook;
 mod whisper_params;
 mod whisper_state;
+mod whisper_vad;
 
 pub use common_logging::GGMLLogLevel;
 pub use error::WhisperError;
@@ -30,13 +36,14 @@ pub use whisper_grammar::{WhisperGrammarElement, WhisperGrammarElementType};
 pub use whisper_params::{FullParams, SamplingStrategy, SegmentCallbackData};
 #[cfg(feature = "raw-api")]
 pub use whisper_rs_sys;
-pub use whisper_state::WhisperState;
+pub use whisper_state::{WhisperSegment, WhisperState, WhisperStateSegmentIterator, WhisperToken};
+pub use whisper_vad::*;
 
 pub type WhisperSysContext = whisper_rs_sys::whisper_context;
 pub type WhisperSysState = whisper_rs_sys::whisper_state;
 
 pub type WhisperTokenData = whisper_rs_sys::whisper_token_data;
-pub type WhisperToken = whisper_rs_sys::whisper_token;
+pub type WhisperTokenId = whisper_rs_sys::whisper_token;
 pub type WhisperNewSegmentCallback = whisper_rs_sys::whisper_new_segment_callback;
 pub type WhisperStartEncoderCallback = whisper_rs_sys::whisper_encoder_begin_callback;
 pub type WhisperProgressCallback = whisper_rs_sys::whisper_progress_callback;

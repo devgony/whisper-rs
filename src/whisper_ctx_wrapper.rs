@@ -1,8 +1,9 @@
+use std::borrow::Cow;
 use std::ffi::{c_int, CStr};
 use std::sync::Arc;
 
 use crate::{
-    WhisperContextParameters, WhisperError, WhisperInnerContext, WhisperState, WhisperToken,
+    WhisperContextParameters, WhisperError, WhisperInnerContext, WhisperState, WhisperTokenId,
 };
 
 pub struct WhisperContext {
@@ -57,7 +58,7 @@ impl WhisperContext {
     /// * text: The text to convert.
     ///
     /// # Returns
-    /// `Ok(Vec<WhisperToken>)` on success, `Err(WhisperError)` on failure.
+    /// `Ok(Vec<WhisperTokenId>)` on success, `Err(WhisperError)` on failure.
     ///
     /// # C++ equivalent
     /// `int whisper_tokenize(struct whisper_context * ctx, const char * text, whisper_token * tokens, int n_max_tokens);`
@@ -65,7 +66,7 @@ impl WhisperContext {
         &self,
         text: &str,
         max_tokens: usize,
-    ) -> Result<Vec<WhisperToken>, WhisperError> {
+    ) -> Result<Vec<WhisperTokenId>, WhisperError> {
         self.ctx.tokenize(text, max_tokens)
     }
 
@@ -76,7 +77,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_n_vocab        (struct whisper_context * ctx)`
-    #[inline]
     pub fn n_vocab(&self) -> c_int {
         self.ctx.n_vocab()
     }
@@ -88,7 +88,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_n_text_ctx     (struct whisper_context * ctx);`
-    #[inline]
     pub fn n_text_ctx(&self) -> c_int {
         self.ctx.n_text_ctx()
     }
@@ -100,7 +99,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_n_audio_ctx     (struct whisper_context * ctx);`
-    #[inline]
     pub fn n_audio_ctx(&self) -> c_int {
         self.ctx.n_audio_ctx()
     }
@@ -109,7 +107,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_is_multilingual(struct whisper_context * ctx)`
-    #[inline]
     pub fn is_multilingual(&self) -> bool {
         self.ctx.is_multilingual()
     }
@@ -121,7 +118,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_vocab      (struct whisper_context * ctx);`
-    #[inline]
     pub fn model_n_vocab(&self) -> c_int {
         self.ctx.model_n_vocab()
     }
@@ -133,7 +129,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_audio_ctx    (struct whisper_context * ctx)`
-    #[inline]
     pub fn model_n_audio_ctx(&self) -> c_int {
         self.ctx.model_n_audio_ctx()
     }
@@ -145,7 +140,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_audio_state(struct whisper_context * ctx);`
-    #[inline]
     pub fn model_n_audio_state(&self) -> c_int {
         self.ctx.model_n_audio_state()
     }
@@ -157,7 +151,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_audio_head (struct whisper_context * ctx);`
-    #[inline]
     pub fn model_n_audio_head(&self) -> c_int {
         self.ctx.model_n_audio_head()
     }
@@ -169,7 +162,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_audio_layer(struct whisper_context * ctx);`
-    #[inline]
     pub fn model_n_audio_layer(&self) -> c_int {
         self.ctx.model_n_audio_layer()
     }
@@ -181,7 +173,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_text_ctx     (struct whisper_context * ctx)`
-    #[inline]
     pub fn model_n_text_ctx(&self) -> c_int {
         self.ctx.model_n_text_ctx()
     }
@@ -193,7 +184,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_text_state (struct whisper_context * ctx);`
-    #[inline]
     pub fn model_n_text_state(&self) -> c_int {
         self.ctx.model_n_text_state()
     }
@@ -205,7 +195,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_text_head  (struct whisper_context * ctx);`
-    #[inline]
     pub fn model_n_text_head(&self) -> c_int {
         self.ctx.model_n_text_head()
     }
@@ -217,7 +206,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_text_layer (struct whisper_context * ctx);`
-    #[inline]
     pub fn model_n_text_layer(&self) -> c_int {
         self.ctx.model_n_text_layer()
     }
@@ -229,7 +217,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_n_mels       (struct whisper_context * ctx);`
-    #[inline]
     pub fn model_n_mels(&self) -> c_int {
         self.ctx.model_n_mels()
     }
@@ -241,7 +228,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_ftype          (struct whisper_context * ctx);`
-    #[inline]
     pub fn model_ftype(&self) -> c_int {
         self.ctx.model_ftype()
     }
@@ -253,55 +239,121 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `int whisper_model_type         (struct whisper_context * ctx);`
-    #[inline]
     pub fn model_type(&self) -> c_int {
         self.ctx.model_type()
     }
 
-    // token functions
-    /// Convert a token ID to a string.
-    ///
-    /// # Arguments
-    /// * token_id: ID of the token.
+    // --- begin model_type_readable ---
+    /// Undocumented but exposed function in the C++ API.
     ///
     /// # Returns
-    /// Ok(&str) on success, Err(WhisperError) on failure.
+    /// * On success: `Ok(&[u8])`
+    /// * On error: `Err(WhisperError::NullPointer)`
     ///
     /// # C++ equivalent
-    /// `const char * whisper_token_to_str(struct whisper_context * ctx, whisper_token token)`
-    pub fn token_to_str(&self, token_id: WhisperToken) -> Result<&str, WhisperError> {
-        self.ctx.token_to_str(token_id)
+    /// `const char * whisper_model_type_readable(struct whisper_context * ctx);`
+    pub fn model_type_readable_bytes(&self) -> Result<&[u8], WhisperError> {
+        self.ctx.model_type_readable_bytes()
     }
-
-    /// Convert a token ID to a &CStr.
-    ///
-    /// # Arguments
-    /// * token_id: ID of the token.
+    /// Undocumented but exposed function in the C++ API.
     ///
     /// # Returns
-    /// Ok(String) on success, Err(WhisperError) on failure.
+    /// * On success: `Ok(&str)`
+    /// * On error: `Err(WhisperError::NullPointer)` or `Err(WhisperError::InvalidUtf8)`
     ///
     /// # C++ equivalent
-    /// `const char * whisper_token_to_str(struct whisper_context * ctx, whisper_token token)`
-    pub fn token_to_cstr(&self, token_id: WhisperToken) -> Result<&CStr, WhisperError> {
-        self.ctx.token_to_cstr(token_id)
+    /// `const char * whisper_model_type_readable(struct whisper_context * ctx);`
+    pub fn model_type_readable_str(&self) -> Result<&str, WhisperError> {
+        self.ctx.model_type_readable_str()
     }
 
     /// Undocumented but exposed function in the C++ API.
-    /// `const char * whisper_model_type_readable(struct whisper_context * ctx);`
+    ///
+    /// This function differs from [`Self::model_type_readable_str`] in that it ignores invalid UTF-8 bytes in the input,
+    /// and instead replaces them with the Unicode replacement character.
     ///
     /// # Returns
-    /// Ok(String) on success, Err(WhisperError) on failure.
-    pub fn model_type_readable(&self) -> Result<String, WhisperError> {
-        self.ctx.model_type_readable()
+    /// * On success: `Ok(Cow<str>)`
+    /// * On error: `Err(WhisperError::NullPointer)`
+    ///
+    /// # C++ equivalent
+    /// `const char * whisper_model_type_readable(struct whisper_context * ctx);`
+    pub fn model_type_readable_str_lossy(&self) -> Result<Cow<'_, str>, WhisperError> {
+        self.ctx.model_type_readable_str_lossy()
+    }
+    // --- end model_type_readable ---
+
+    // --- begin token functions ---
+    /// Convert a token ID to a byte array.
+    ///
+    /// **Danger**: this function is liable to throw a C++ exception if you pass an out-of-bounds index.
+    /// There is no way to check if your index is in bounds from Rust.
+    /// C++ exceptions *cannot* be caught and *will* cause the Rust runtime to abort your program.
+    /// Use this function and its siblings with extreme caution.
+    ///
+    /// # Arguments
+    /// * `token_id`: ID of the token.
+    ///
+    /// # Returns
+    /// * On success: `Ok(&[u8])`
+    /// * On out-of-bounds index: foreign runtime exception, causing your entire program to abort.
+    /// * On other error: `Err(WhisperError::NullPointer)`
+    ///
+    /// # C++ equivalent
+    /// `const char * whisper_token_to_str(struct whisper_context * ctx, whisper_token token)`
+    pub fn token_to_bytes(&self, token_id: WhisperTokenId) -> Result<&[u8], WhisperError> {
+        self.ctx.token_to_bytes(token_id)
+    }
+
+    /// Convert a token ID to a string.
+    ///
+    /// **Danger**: this function is liable to throw a C++ exception if you pass an out-of-bounds index.
+    /// See [`Self::token_to_bytes`] for more information.
+    ///
+    /// # Arguments
+    /// * `token_id`: ID of the token.
+    ///
+    /// # Returns
+    /// * On success: `Ok(&str)`
+    /// * On out-of-bounds index: foreign runtime exception, causing your entire program to abort.
+    /// * On other error: `Err(WhisperError::NullPointer)` or `Err(WhisperError::InvalidUtf8)`
+    ///
+    /// # C++ equivalent
+    /// `const char * whisper_token_to_str(struct whisper_context * ctx, whisper_token token)`
+    pub fn token_to_str(&self, token_id: WhisperTokenId) -> Result<&str, WhisperError> {
+        self.ctx.token_to_str(token_id)
+    }
+
+    /// Convert a token ID to a string.
+    ///
+    /// This function differs from [`Self::token_to_str`] in that it ignores invalid UTF-8 bytes in the input,
+    /// and instead replaces them with the Unicode replacement character.
+    ///
+    /// **Danger**: this function is liable to throw a C++ exception if you pass an out-of-bounds index.
+    /// See [`Self::token_to_bytes`] for more information.
+    ///
+    /// # Arguments
+    /// * `token_id`: ID of the token.
+    ///
+    /// # Returns
+    /// * On success: `Ok(Cow<str>)`
+    /// * On out-of-bounds index: foreign runtime exception, causing your entire program to abort.
+    /// * On other error: `Err(WhisperError::NullPointer)`
+    ///
+    /// # C++ equivalent
+    /// `const char * whisper_token_to_str(struct whisper_context * ctx, whisper_token token)`
+    pub fn token_to_str_lossy(
+        &self,
+        token_id: WhisperTokenId,
+    ) -> Result<Cow<'_, str>, WhisperError> {
+        self.ctx.token_to_str_lossy(token_id)
     }
 
     /// Get the ID of the eot token.
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_eot (struct whisper_context * ctx)`
-    #[inline]
-    pub fn token_eot(&self) -> WhisperToken {
+    pub fn token_eot(&self) -> WhisperTokenId {
         self.ctx.token_eot()
     }
 
@@ -309,8 +361,7 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_sot (struct whisper_context * ctx)`
-    #[inline]
-    pub fn token_sot(&self) -> WhisperToken {
+    pub fn token_sot(&self) -> WhisperTokenId {
         self.ctx.token_sot()
     }
 
@@ -318,8 +369,7 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_solm(struct whisper_context * ctx)`
-    #[inline]
-    pub fn token_solm(&self) -> WhisperToken {
+    pub fn token_solm(&self) -> WhisperTokenId {
         self.ctx.token_solm()
     }
 
@@ -327,8 +377,7 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_prev(struct whisper_context * ctx)`
-    #[inline]
-    pub fn token_prev(&self) -> WhisperToken {
+    pub fn token_prev(&self) -> WhisperTokenId {
         self.ctx.token_prev()
     }
 
@@ -336,8 +385,7 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_nosp(struct whisper_context * ctx)`
-    #[inline]
-    pub fn token_nosp(&self) -> WhisperToken {
+    pub fn token_nosp(&self) -> WhisperTokenId {
         self.ctx.token_nosp()
     }
 
@@ -345,8 +393,7 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_not (struct whisper_context * ctx)`
-    #[inline]
-    pub fn token_not(&self) -> WhisperToken {
+    pub fn token_not(&self) -> WhisperTokenId {
         self.ctx.token_not()
     }
 
@@ -354,8 +401,7 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_beg (struct whisper_context * ctx)`
-    #[inline]
-    pub fn token_beg(&self) -> WhisperToken {
+    pub fn token_beg(&self) -> WhisperTokenId {
         self.ctx.token_beg()
     }
 
@@ -366,16 +412,15 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_lang(struct whisper_context * ctx, int lang_id)`
-    #[inline]
-    pub fn token_lang(&self, lang_id: c_int) -> WhisperToken {
+    pub fn token_lang(&self, lang_id: c_int) -> WhisperTokenId {
         self.ctx.token_lang(lang_id)
     }
+    // --- end token functions ---
 
     /// Print performance statistics to stderr.
     ///
     /// # C++ equivalent
     /// `void whisper_print_timings(struct whisper_context * ctx)`
-    #[inline]
     pub fn print_timings(&self) {
         self.ctx.print_timings()
     }
@@ -384,7 +429,6 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `void whisper_reset_timings(struct whisper_context * ctx)`
-    #[inline]
     pub fn reset_timings(&self) {
         self.ctx.reset_timings()
     }
@@ -394,7 +438,7 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_translate ()`
-    pub fn token_translate(&self) -> WhisperToken {
+    pub fn token_translate(&self) -> WhisperTokenId {
         self.ctx.token_translate()
     }
 
@@ -402,7 +446,7 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `whisper_token whisper_token_transcribe()`
-    pub fn token_transcribe(&self) -> WhisperToken {
+    pub fn token_transcribe(&self) -> WhisperTokenId {
         self.ctx.token_transcribe()
     }
 
@@ -421,7 +465,7 @@ impl WhisperContext {
             Err(WhisperError::InitError)
         } else {
             // SAFETY: this is known to be a valid pointer to a `whisper_state` struct
-            Ok(WhisperState::new(self.ctx.clone(), state))
+            Ok(unsafe { WhisperState::new(self.ctx.clone(), state) })
         }
     }
 }

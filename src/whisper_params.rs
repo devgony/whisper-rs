@@ -1,25 +1,31 @@
 use crate::whisper_grammar::WhisperGrammarElement;
+use crate::whisper_vad::WhisperVadParams;
 use std::ffi::{c_char, c_float, c_int, CString};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use whisper_rs_sys::whisper_token;
 
+/// The sampling strategy to use to pick tokens from a list of likely possibilities.
 #[derive(Debug, Clone)]
 pub enum SamplingStrategy {
+    /// Greedy sampling: picks the token with the highest probability after having seen `best_of` tokens.
     Greedy {
+        /// Defaults to 5 in `whisper.cpp`. Will be clamped to at least 1.
         best_of: c_int,
     },
+    /// Beam search. Much harder to explain in a blurb.
+    /// Tends to be more accurate in exchange for more CPU time.
     BeamSearch {
+        /// The maximum width of the beam.
+        /// Higher values are better (to a point) at the cost of exponential CPU time.
+        ///
+        /// Defaults to 5 in `whisper.cpp`. Will be clamped to at least 1.
         beam_size: c_int,
-        // not implemented in whisper.cpp as of this writing (v1.2.0)
+        /// Not implemented in `whisper.cpp` as of this writing (02-08-2025, `whisper.cpp` v1.7.6).
+        ///
+        /// Defaults to -1.0.
         patience: c_float,
     },
-}
-
-impl Default for SamplingStrategy {
-    fn default() -> Self {
-        Self::Greedy { best_of: 1 }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -62,9 +68,13 @@ impl<'a, 'b> FullParams<'a, 'b> {
                 fp.greedy.best_of = best_of;
             }
             SamplingStrategy::BeamSearch {
-                beam_size,
+                mut beam_size,
                 patience,
             } => {
+                if beam_size < 1 {
+                    beam_size = 1;
+                }
+
                 fp.beam_search.beam_size = beam_size;
                 fp.beam_search.patience = patience;
             }
@@ -376,6 +386,7 @@ impl<'a, 'b> FullParams<'a, 'b> {
     /// Do not use this function unless you know what you are doing.
     /// * Be careful not to mutate the state of the whisper_context pointer returned in the callback.
     ///   This could cause undefined behavior, as this violates the thread-safety guarantees of the underlying C library.
+    ///
     /// **Warning** Can't be used with DTW. DTW will produce inconsistent callback invocation
     ///
     /// Defaults to None.
@@ -433,14 +444,13 @@ impl<'a, 'b> FullParams<'a, 'b> {
                     let t0 = whisper_rs_sys::whisper_full_get_segment_t0_from_state(state, i);
                     let t1 = whisper_rs_sys::whisper_full_get_segment_t1_from_state(state, i);
 
-                    match text.to_str() {
-                        Ok(n) => user_data(SegmentCallbackData {
+                    if let Ok(n) = text.to_str() {
+                        user_data(SegmentCallbackData {
                             segment: i,
                             start_timestamp: t0,
                             end_timestamp: t1,
                             text: n.to_string(),
-                        }),
-                        Err(_) => {}
+                        })
                     }
                 }
             }
@@ -799,6 +809,39 @@ impl<'a, 'b> FullParams<'a, 'b> {
         self.fp.initial_prompt = CString::new(initial_prompt)
             .expect("Initial prompt contains null byte")
             .into_raw() as *const c_char;
+    }
+
+    /// Enable or disable VAD.
+    ///
+    /// # Panics
+    /// This method will panic if `vad_model_path` is not set prior to enabling VAD.
+    pub fn enable_vad(&mut self, vad: bool) {
+        if vad && self.fp.vad_model_path.is_null() {
+            panic!("Set a VAD model path before calling enable_vad");
+        }
+
+        self.fp.vad = vad;
+    }
+
+    /// Set the path where a VAD model can be found. Passing `None` will clear it and disable VAD.
+    ///
+    /// # Panics
+    /// This method will panic if `vad_model_path` contains a null byte.
+    pub fn set_vad_model_path(&mut self, vad_model_path: Option<&str>) {
+        self.fp.vad_model_path = if let Some(vad_model_path) = vad_model_path {
+            CString::new(vad_model_path)
+                .expect("VAD model path contains null byte")
+                .into_raw() as *const c_char
+        } else {
+            self.fp.vad = false;
+
+            std::ptr::null()
+        };
+    }
+
+    /// Replace the VAD model parameters.
+    pub fn set_vad_params(&mut self, params: WhisperVadParams) {
+        self.fp.vad_params = params.into_inner();
     }
 }
 
