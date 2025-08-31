@@ -174,6 +174,8 @@ fn main() {
 
     if cfg!(target_os = "windows") {
         config.cxxflag("/utf-8");
+        // Use baseline x86-64 for broader compatibility
+        config.cxxflag("/arch:SSE2");
         println!("cargo:rustc-link-lib=advapi32");
     }
 
@@ -252,6 +254,12 @@ fn main() {
         config.define("CMAKE_BUILD_TYPE", "RelWithDebInfo");
         config.cxxflag("-DWHISPER_DEBUG");
     }
+
+    // Disable CPU-specific optimizations for broader compatibility
+    config.define("GGML_NATIVE", "OFF");
+    config.define("GGML_AVX", "OFF");
+    config.define("GGML_AVX2", "OFF");
+    config.define("GGML_FMA", "OFF");
 
     // Allow passing any WHISPER or CMAKE compile flags
     for (key, value) in env::vars() {
