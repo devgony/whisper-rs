@@ -1,0 +1,14 @@
+--- a/ggml/src/ggml-cpu/ggml-cpu.cpp
++++ b/ggml/src/ggml-cpu/ggml-cpu.cpp
+@@ -1,3 +1,10 @@
++// Force disable all SIMD for Windows compatibility
++#ifdef _WIN32
++#undef __SSE__
++#undef __SSE2__
++#undef __SSE3__
++#undef __AVX__
++#undef __AVX2__
++#undef __FMA__
++#undef __F16C__
++#define GGML_USE_REFERENCE_IMPL 1
++#endif

@@ -113,6 +113,15 @@ fn main() {
                 e
             )
         });
+        
+        // On Windows, patch the source to disable SIMD
+        if cfg!(target_os = "windows") {
+            std::process::Command::new("cmd")
+                .args(&["/C", "patch_whisper.bat"])
+                .current_dir(".")
+                .status()
+                .expect("Failed to patch whisper.cpp");
+        }
     }
 
     if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() {
@@ -175,37 +184,47 @@ fn main() {
     if cfg!(target_os = "windows") {
         config.cxxflag("/utf-8");
         
-        // Include our compatibility header to force disable SIMD
-        let out_dir_str = env::var("OUT_DIR").unwrap();
-        let out_dir_path = PathBuf::from(&out_dir_str);
-        std::fs::copy("windows_compat.h", out_dir_path.join("windows_compat.h"))
-            .expect("Failed to copy windows_compat.h");
-        config.cxxflag(format!("/FI{}/windows_compat.h", out_dir_str));  // Force include header
+        // Force completely scalar build - no SIMD at all
+        config.cxxflag("/O1");  // Optimize for size, not speed
+        config.cxxflag("/Oi-"); // Disable intrinsic functions
+        config.cxxflag("/fp:precise"); // Use precise floating point
         
-        // Use the most conservative architecture setting
-        // Note: /arch:IA32 is not valid for x64, so we don't specify /arch at all
-        // This defaults to SSE2 which is baseline for x86-64
+        // Undefine all SIMD macros at preprocessor level
+        config.cxxflag("/U__SSE__");
+        config.cxxflag("/U__SSE2__");
+        config.cxxflag("/U__SSE3__");
+        config.cxxflag("/U__SSSE3__");
+        config.cxxflag("/U__SSE4_1__");
+        config.cxxflag("/U__SSE4_2__");
+        config.cxxflag("/U__AVX__");
+        config.cxxflag("/U__AVX2__");
+        config.cxxflag("/U__FMA__");
+        config.cxxflag("/U__F16C__");
+        config.cxxflag("/U__BMI__");
+        config.cxxflag("/U__BMI2__");
+        config.cxxflag("/U__POPCNT__");
+        config.cxxflag("/U__LZCNT__");
         
-        // Force disable ALL SIMD optimizations through defines
-        config.define("__SSE3__", "0");
-        config.define("__SSSE3__", "0");
-        config.define("__SSE4_1__", "0");
-        config.define("__SSE4_2__", "0");
-        config.define("__AVX__", "0");
-        config.define("__AVX2__", "0");
-        config.define("__AVX512F__", "0");
-        config.define("__FMA__", "0");
-        config.define("__F16C__", "0");
-        config.define("__BMI__", "0");
-        config.define("__BMI2__", "0");
-        config.define("__POPCNT__", "0");
-        config.define("__LZCNT__", "0");
+        // Define them as 0 to prevent any conditional compilation
+        config.cxxflag("/D__SSE__=0");
+        config.cxxflag("/D__SSE2__=0");
+        config.cxxflag("/D__SSE3__=0");
+        config.cxxflag("/D__SSSE3__=0");
+        config.cxxflag("/D__SSE4_1__=0");
+        config.cxxflag("/D__SSE4_2__=0");
+        config.cxxflag("/D__AVX__=0");
+        config.cxxflag("/D__AVX2__=0");
+        config.cxxflag("/D__FMA__=0");
+        config.cxxflag("/D__F16C__=0");
+        
+        // Force reference implementations
+        config.cxxflag("/DGGML_USE_REFERENCE_IMPL=1");
+        config.cxxflag("/DGGML_DISABLE_INTRINSICS=1");
         
         // Additional compiler flags for maximum compatibility
         config.cxxflag("/D_M_IX86_FP=0");  // No SSE/SSE2 floating point
         config.cxxflag("/Oy-");  // Disable frame pointer omission
         config.cxxflag("/GS");   // Enable security checks
-        config.cxxflag("/guard:cf");  // Control flow guard
         
         // Explicitly set minimum Windows version for compatibility
         config.define("_WIN32_WINNT", "0x0601");  // Windows 7 minimum
@@ -292,7 +311,7 @@ fn main() {
     // Disable ALL CPU-specific optimizations for broader compatibility
     config.define("GGML_NATIVE", "OFF");
     
-    // Enable only SSE and SSE2 which are baseline for x86-64
+    // Disable ALL SIMD instructions including SSE/SSE2
     config.define("GGML_SSE3", "OFF");
     config.define("GGML_SSSE3", "OFF");
     config.define("GGML_SSE41", "OFF");
@@ -309,13 +328,20 @@ fn main() {
     config.define("GGML_AVX512_BF16", "OFF");
     config.define("GGML_AVX_VNNI", "OFF");
     
-    // Explicitly disable CPU runtime detection to avoid issues
-    config.define("GGML_CPU_HAS_SSE3", "0");
-    config.define("GGML_CPU_HAS_SSSE3", "0");
-    config.define("GGML_CPU_HAS_AVX", "0");
-    config.define("GGML_CPU_HAS_AVX2", "0");
-    config.define("GGML_CPU_HAS_FMA", "0");
-    config.define("GGML_CPU_HAS_F16C", "0");
+    // Force use of scalar/reference implementations only
+    config.define("GGML_NO_ACCELERATE", "1");
+    config.define("GGML_USE_ACCELERATE", "0");
+    
+    // Disable all CPU feature detection
+    config.define("CMAKE_SYSTEM_PROCESSOR", "generic");
+    
+    // Force scalar math operations
+    config.define("GGML_VECTOR_SIZE", "1");
+    
+    // Additional flags to force reference implementation
+    config.define("GGML_USE_REFERENCE_IMPL", "1");
+    config.define("GGML_DISABLE_INTRINSICS", "1");
+    config.define("GGML_CPU_FEATURES_DISABLED", "1");
     
     // Disable llamafile as it may cause CPU detection issues
     // Instead rely on our explicit disabling of all SIMD instructions

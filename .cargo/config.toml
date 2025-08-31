@@ -1,10 +1,19 @@
 [build]
 # Force using only baseline x86_64 instructions for broader compatibility
-# Use the most generic CPU target possible
-rustflags = ["-C", "target-cpu=generic", "-C", "target-feature=-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-fma,-f16c"]
+# Explicitly target the oldest x86-64 architecture
+rustflags = [
+    "-C", "target-cpu=x86-64",
+    "-C", "target-feature=-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-fma,-f16c,-bmi,-bmi2,-popcnt,-lzcnt",
+    "-C", "opt-level=2",
+    "-C", "codegen-units=1"
+]
 
 [env]
 # Disable ALL CPU-specific optimizations in the C++ build
-# Use only the most basic x86-64 instructions
-CFLAGS = "-march=x86-64 -mtune=generic -mno-sse3 -mno-ssse3 -mno-sse4 -mno-sse4.1 -mno-sse4.2 -mno-avx -mno-avx2 -mno-fma -mno-f16c"
-CXXFLAGS = "-march=x86-64 -mtune=generic -mno-sse3 -mno-ssse3 -mno-sse4 -mno-sse4.1 -mno-sse4.2 -mno-avx -mno-avx2 -mno-fma -mno-f16c"
+# Force pure scalar implementations
+CFLAGS = "-O1 -fno-tree-vectorize -fno-slp-vectorize"
+CXXFLAGS = "-O1 -fno-tree-vectorize -fno-slp-vectorize"
+
+# Override any system-specific optimizations
+CMAKE_C_FLAGS = "-O1 -fno-tree-vectorize"
+CMAKE_CXX_FLAGS = "-O1 -fno-tree-vectorize"
