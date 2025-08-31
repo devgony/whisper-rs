@@ -1,0 +1,32 @@
+// GGML patch to completely disable SIMD and CPU detection
+// Add this to the top of ggml source files
+
+#ifdef _WIN32
+  // Override all CPU detection functions to return false
+  #define GGML_CPU_HAS_SSE3()    false
+  #define GGML_CPU_HAS_SSSE3()   false
+  #define GGML_CPU_HAS_SSE41()   false
+  #define GGML_CPU_HAS_SSE42()   false
+  #define GGML_CPU_HAS_AVX()     false
+  #define GGML_CPU_HAS_AVX2()    false
+  #define GGML_CPU_HAS_AVX512()  false
+  #define GGML_CPU_HAS_FMA()     false
+  #define GGML_CPU_HAS_F16C()    false
+  
+  // Disable all vector sizes
+  #undef GGML_SIMD
+  #undef GGML_F32_STEP
+  #undef GGML_F16_STEP
+  #define GGML_F32_STEP 1
+  #define GGML_F16_STEP 1
+  
+  // Force scalar implementations
+  #define GGML_F32_VEC void
+  #define GGML_F32_VEC_ZERO {}
+  #define GGML_F32_VEC_SET1(x) (x)
+  #define GGML_F32_VEC_LOAD(x) (*(x))
+  #define GGML_F32_VEC_STORE(x,y) (*(x) = (y))
+  #define GGML_F32_VEC_FMA(a,b,c) ((a) * (b) + (c))
+  #define GGML_F32_VEC_ADD(a,b) ((a) + (b))
+  #define GGML_F32_VEC_MUL(a,b) ((a) * (b))
+#endif

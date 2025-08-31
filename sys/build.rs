@@ -180,14 +180,33 @@ fn main() {
         .define("WHISPER_BUILD_EXAMPLES", "OFF")
         .very_verbose(true)
         .pic(true);
+    
+    // Use custom toolchain file on Windows for maximum compatibility
+    if cfg!(target_os = "windows") {
+        let toolchain_file = std::env::current_dir()
+            .unwrap()
+            .join("sys")
+            .join("windows-compat-toolchain.cmake");
+        config.define("CMAKE_TOOLCHAIN_FILE", toolchain_file.to_str().unwrap());
+        
+        // Force static runtime linking
+        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreaded");
+        config.define("USE_STATIC_RUNTIME", "ON");
+    }
 
     if cfg!(target_os = "windows") {
         config.cxxflag("/utf-8");
+        
+        // Force static runtime linking to avoid DLL issues
+        config.cxxflag("/MT");  // Use static multithreaded runtime
+        config.cflag("/MT");
         
         // Force completely scalar build - no SIMD at all
         config.cxxflag("/O1");  // Optimize for size, not speed
         config.cxxflag("/Oi-"); // Disable intrinsic functions
         config.cxxflag("/fp:precise"); // Use precise floating point
+        config.cxxflag("/Gy-"); // Disable function-level linking
+        config.cxxflag("/Gw-"); // Disable global optimization
         
         // Undefine all SIMD macros at preprocessor level
         config.cxxflag("/U__SSE__");
@@ -230,6 +249,7 @@ fn main() {
         config.define("_WIN32_WINNT", "0x0601");  // Windows 7 minimum
         
         println!("cargo:rustc-link-lib=advapi32");
+        println!("cargo:rustc-link-lib=static=msvcrt");  // Link static runtime
     }
 
     if cfg!(feature = "coreml") {
