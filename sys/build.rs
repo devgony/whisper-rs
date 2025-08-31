@@ -174,16 +174,42 @@ fn main() {
 
     if cfg!(target_os = "windows") {
         config.cxxflag("/utf-8");
-        // Disable all advanced instruction sets for maximum compatibility
-        // This ensures the binary runs on all x86-64 CPUs
-        config.cxxflag("/arch:SSE");  // Use only SSE, which is baseline for x86-64
-        config.cxxflag("/D__SSE__");
-        config.cxxflag("/D__SSE2__");
-        // Explicitly disable newer instruction sets
-        config.cxxflag("/D__AVX__=0");
-        config.cxxflag("/D__AVX2__=0");
-        config.cxxflag("/D__FMA__=0");
-        config.cxxflag("/D__F16C__=0");
+        
+        // Include our compatibility header to force disable SIMD
+        let out_dir_str = env::var("OUT_DIR").unwrap();
+        let out_dir_path = PathBuf::from(&out_dir_str);
+        std::fs::copy("windows_compat.h", out_dir_path.join("windows_compat.h"))
+            .expect("Failed to copy windows_compat.h");
+        config.cxxflag(format!("/FI{}/windows_compat.h", out_dir_str));  // Force include header
+        
+        // Use the most conservative architecture setting
+        // Note: /arch:IA32 is not valid for x64, so we don't specify /arch at all
+        // This defaults to SSE2 which is baseline for x86-64
+        
+        // Force disable ALL SIMD optimizations through defines
+        config.define("__SSE3__", "0");
+        config.define("__SSSE3__", "0");
+        config.define("__SSE4_1__", "0");
+        config.define("__SSE4_2__", "0");
+        config.define("__AVX__", "0");
+        config.define("__AVX2__", "0");
+        config.define("__AVX512F__", "0");
+        config.define("__FMA__", "0");
+        config.define("__F16C__", "0");
+        config.define("__BMI__", "0");
+        config.define("__BMI2__", "0");
+        config.define("__POPCNT__", "0");
+        config.define("__LZCNT__", "0");
+        
+        // Additional compiler flags for maximum compatibility
+        config.cxxflag("/D_M_IX86_FP=0");  // No SSE/SSE2 floating point
+        config.cxxflag("/Oy-");  // Disable frame pointer omission
+        config.cxxflag("/GS");   // Enable security checks
+        config.cxxflag("/guard:cf");  // Control flow guard
+        
+        // Explicitly set minimum Windows version for compatibility
+        config.define("_WIN32_WINNT", "0x0601");  // Windows 7 minimum
+        
         println!("cargo:rustc-link-lib=advapi32");
     }
 
@@ -265,11 +291,17 @@ fn main() {
 
     // Disable ALL CPU-specific optimizations for broader compatibility
     config.define("GGML_NATIVE", "OFF");
+    
+    // Enable only SSE and SSE2 which are baseline for x86-64
+    config.define("GGML_SSE3", "OFF");
+    config.define("GGML_SSSE3", "OFF");
+    config.define("GGML_SSE41", "OFF");
     config.define("GGML_SSE42", "OFF");
     config.define("GGML_AVX", "OFF");
     config.define("GGML_AVX2", "OFF");
     config.define("GGML_FMA", "OFF");
     config.define("GGML_F16C", "OFF");
+    config.define("GGML_BMI", "OFF");
     config.define("GGML_BMI2", "OFF");
     config.define("GGML_AVX512", "OFF");
     config.define("GGML_AVX512_VBMI", "OFF");
@@ -277,10 +309,17 @@ fn main() {
     config.define("GGML_AVX512_BF16", "OFF");
     config.define("GGML_AVX_VNNI", "OFF");
     
-    // Use llamafile for better CPU compatibility with runtime detection
-    if cfg!(target_os = "windows") {
-        config.define("GGML_LLAMAFILE", "ON");
-    }
+    // Explicitly disable CPU runtime detection to avoid issues
+    config.define("GGML_CPU_HAS_SSE3", "0");
+    config.define("GGML_CPU_HAS_SSSE3", "0");
+    config.define("GGML_CPU_HAS_AVX", "0");
+    config.define("GGML_CPU_HAS_AVX2", "0");
+    config.define("GGML_CPU_HAS_FMA", "0");
+    config.define("GGML_CPU_HAS_F16C", "0");
+    
+    // Disable llamafile as it may cause CPU detection issues
+    // Instead rely on our explicit disabling of all SIMD instructions
+    config.define("GGML_LLAMAFILE", "OFF");
 
     // Allow passing any WHISPER or CMAKE compile flags
     for (key, value) in env::vars() {
