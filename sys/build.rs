@@ -174,8 +174,16 @@ fn main() {
 
     if cfg!(target_os = "windows") {
         config.cxxflag("/utf-8");
-        // Use baseline x86-64 for broader compatibility
-        config.cxxflag("/arch:SSE2");
+        // Disable all advanced instruction sets for maximum compatibility
+        // This ensures the binary runs on all x86-64 CPUs
+        config.cxxflag("/arch:SSE");  // Use only SSE, which is baseline for x86-64
+        config.cxxflag("/D__SSE__");
+        config.cxxflag("/D__SSE2__");
+        // Explicitly disable newer instruction sets
+        config.cxxflag("/D__AVX__=0");
+        config.cxxflag("/D__AVX2__=0");
+        config.cxxflag("/D__FMA__=0");
+        config.cxxflag("/D__F16C__=0");
         println!("cargo:rustc-link-lib=advapi32");
     }
 
@@ -255,11 +263,24 @@ fn main() {
         config.cxxflag("-DWHISPER_DEBUG");
     }
 
-    // Disable CPU-specific optimizations for broader compatibility
+    // Disable ALL CPU-specific optimizations for broader compatibility
     config.define("GGML_NATIVE", "OFF");
+    config.define("GGML_SSE42", "OFF");
     config.define("GGML_AVX", "OFF");
     config.define("GGML_AVX2", "OFF");
     config.define("GGML_FMA", "OFF");
+    config.define("GGML_F16C", "OFF");
+    config.define("GGML_BMI2", "OFF");
+    config.define("GGML_AVX512", "OFF");
+    config.define("GGML_AVX512_VBMI", "OFF");
+    config.define("GGML_AVX512_VNNI", "OFF");
+    config.define("GGML_AVX512_BF16", "OFF");
+    config.define("GGML_AVX_VNNI", "OFF");
+    
+    // Use llamafile for better CPU compatibility with runtime detection
+    if cfg!(target_os = "windows") {
+        config.define("GGML_LLAMAFILE", "ON");
+    }
 
     // Allow passing any WHISPER or CMAKE compile flags
     for (key, value) in env::vars() {
