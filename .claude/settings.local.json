@@ -4,7 +4,8 @@
       "Bash(rustc:*)",
       "Bash(cargo clean:*)",
       "Bash(dir:*)",
-      "Bash(git submodule:*)"
+      "Bash(git submodule:*)",
+      "Bash(del syswindows-compat-toolchain.cmake)"
     ],
     "deny": [],
     "ask": []

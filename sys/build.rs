@@ -181,28 +181,15 @@ fn main() {
         .very_verbose(true)
         .pic(true);
     
-    // Use custom toolchain file on Windows for maximum compatibility
     if cfg!(target_os = "windows") {
-        let toolchain_file = std::env::current_dir()
-            .unwrap()
-            .join("sys")
-            .join("windows-compat-toolchain.cmake");
-        config.define("CMAKE_TOOLCHAIN_FILE", toolchain_file.to_str().unwrap());
-    }
-
-    if cfg!(target_os = "windows") {
+        // Force use dynamic runtime consistently across all configurations
+        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreadedDLL");
+        
+        // Set base compiler flags for Windows
         config.cxxflag("/utf-8");
         
-        // Use dynamic runtime linking
-        config.cxxflag("/MD");  // Use dynamic multithreaded runtime
-        config.cflag("/MD");
-        
         // Force completely scalar build - no SIMD at all
-        config.cxxflag("/O1");  // Optimize for size, not speed
-        config.cxxflag("/Oi-"); // Disable intrinsic functions
-        config.cxxflag("/fp:precise"); // Use precise floating point
-        config.cxxflag("/Gy-"); // Disable function-level linking
-        config.cxxflag("/Gw-"); // Disable global optimization
+        // These flags override defaults and ensure no CPU-specific code
         
         // Undefine all SIMD macros at preprocessor level
         config.cxxflag("/U__SSE__");
@@ -238,8 +225,6 @@ fn main() {
         
         // Additional compiler flags for maximum compatibility
         config.cxxflag("/D_M_IX86_FP=0");  // No SSE/SSE2 floating point
-        config.cxxflag("/Oy-");  // Disable frame pointer omission
-        config.cxxflag("/GS");   // Enable security checks
         
         // Explicitly set minimum Windows version for compatibility
         config.define("_WIN32_WINNT", "0x0601");  // Windows 7 minimum
