@@ -188,18 +188,14 @@ fn main() {
             .join("sys")
             .join("windows-compat-toolchain.cmake");
         config.define("CMAKE_TOOLCHAIN_FILE", toolchain_file.to_str().unwrap());
-        
-        // Force static runtime linking
-        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreaded");
-        config.define("USE_STATIC_RUNTIME", "ON");
     }
 
     if cfg!(target_os = "windows") {
         config.cxxflag("/utf-8");
         
-        // Force static runtime linking to avoid DLL issues
-        config.cxxflag("/MT");  // Use static multithreaded runtime
-        config.cflag("/MT");
+        // Use dynamic runtime linking
+        config.cxxflag("/MD");  // Use dynamic multithreaded runtime
+        config.cflag("/MD");
         
         // Force completely scalar build - no SIMD at all
         config.cxxflag("/O1");  // Optimize for size, not speed
@@ -249,7 +245,6 @@ fn main() {
         config.define("_WIN32_WINNT", "0x0601");  // Windows 7 minimum
         
         println!("cargo:rustc-link-lib=advapi32");
-        println!("cargo:rustc-link-lib=static=msvcrt");  // Link static runtime
     }
 
     if cfg!(feature = "coreml") {

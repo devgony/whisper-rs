@@ -7,11 +7,11 @@ set(CMAKE_SYSTEM_PROCESSOR x86_64)
 # Force MSVC to use the most conservative settings
 if(MSVC)
     # Disable all optimizations that might use CPU-specific instructions
-    set(CMAKE_C_FLAGS_INIT "/O1 /Oi- /fp:precise /GS /Gy- /Gw-")
-    set(CMAKE_CXX_FLAGS_INIT "/O1 /Oi- /fp:precise /GS /Gy- /Gw- /EHsc")
+    set(CMAKE_C_FLAGS_INIT "/O1 /Oi- /fp:precise /GS /Gy- /Gw- /MD")
+    set(CMAKE_CXX_FLAGS_INIT "/O1 /Oi- /fp:precise /GS /Gy- /Gw- /EHsc /MD")
     
-    # Force static runtime to avoid DLL dependencies
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+    # Use dynamic runtime
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
     
     # Disable all CPU feature detection
     add_compile_definitions(

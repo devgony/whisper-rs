@@ -5,14 +5,13 @@ rustflags = [
     "-C", "target-cpu=x86-64",
     "-C", "target-feature=-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-fma,-f16c,-bmi,-bmi2,-popcnt,-lzcnt",
     "-C", "opt-level=2",
-    "-C", "codegen-units=1",
-    "-C", "target-feature=+crt-static"
+    "-C", "codegen-units=1"
 ]
 
 [target.x86_64-pc-windows-msvc]
 rustflags = [
     "-C", "target-cpu=x86-64",
-    "-C", "target-feature=-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-fma,-f16c,-bmi,-bmi2,-popcnt,-lzcnt,+crt-static"
+    "-C", "target-feature=-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-fma,-f16c,-bmi,-bmi2,-popcnt,-lzcnt"
 ]
 
 [env]

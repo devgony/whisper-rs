@@ -7,16 +7,16 @@ Write-Host "Setting up environment for maximum CPU compatibility build..." -Fore
 $env:CARGO_CFG_TARGET_FEATURE = ""
 $env:CARGO_CFG_TARGET_CPU = "x86-64"
 
-# Force MSVC to use conservative settings
-$env:_CL_ = "/O1 /Oi- /fp:precise /MT /D__SSE__=0 /D__SSE2__=0 /D__AVX__=0 /D__AVX2__=0"
+# Force MSVC to use conservative settings with dynamic runtime
+$env:_CL_ = "/O1 /Oi- /fp:precise /MD /D__SSE__=0 /D__SSE2__=0 /D__AVX__=0 /D__AVX2__=0"
 $env:_LINK_ = "/MACHINE:X64 /SUBSYSTEM:WINDOWS"
 
 # Disable any CPU detection in CMake
 $env:CMAKE_SYSTEM_PROCESSOR = "x86_64"
 $env:CMAKE_HOST_SYSTEM_PROCESSOR = "x86_64"
 
-# Force static runtime
-$env:CMAKE_MSVC_RUNTIME_LIBRARY = "MultiThreaded"
+# Use dynamic runtime
+$env:CMAKE_MSVC_RUNTIME_LIBRARY = "MultiThreadedDLL"
 
 # Clean previous builds
 Write-Host "Cleaning previous build artifacts..." -ForegroundColor Yellow
