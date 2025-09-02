@@ -173,11 +173,12 @@ fn main() {
 
     config
         .profile("Release")
-        .define("BUILD_SHARED_LIBS", "OFF")
+        .define("BUILD_SHARED_LIBS", "ON")  // Build as DLL
         .define("WHISPER_ALL_WARNINGS", "OFF")
         .define("WHISPER_ALL_WARNINGS_3RD_PARTY", "OFF")
         .define("WHISPER_BUILD_TESTS", "OFF")
         .define("WHISPER_BUILD_EXAMPLES", "OFF")
+        .define("CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS", "ON")  // Export all symbols for DLL
         .very_verbose(true)
         .pic(true);
     
@@ -369,21 +370,119 @@ fn main() {
         config.define("CMAKE_CXX_COMPILER", "icpx");
     }
 
-    let destination = config.build();
+    // Check environment variable for build type
+    let build_type = env::var("WHISPER_BUILD_TYPE").unwrap_or_else(|_| "scalar".to_string());
+    println!("cargo:rerun-if-env-changed=WHISPER_BUILD_TYPE");
+    
+    let destination = if build_type == "avx" {
+        // Enable AVX optimizations for this build
+        config.define("GGML_AVX", "ON");
+        config.define("GGML_AVX2", "ON"); 
+        config.define("GGML_FMA", "ON");
+        config.define("GGML_F16C", "ON");
+        config.define("GGML_SSE3", "ON");
+        config.define("GGML_SSSE3", "ON");
+        config.define("GGML_SSE41", "ON");
+        config.define("GGML_SSE42", "ON");
+        
+        // Override scalar-only settings for AVX build
+        config.define("GGML_NATIVE", "ON");
+        config.define("GGML_USE_REFERENCE_IMPL", "0");
+        config.define("GGML_DISABLE_INTRINSICS", "0");
+        config.define("GGML_CPU_FEATURES_DISABLED", "0");
+        
+        if cfg!(target_os = "windows") {
+            // Don't add SIMD disable flags for AVX build
+            println!("cargo:warning=Building AVX-optimized version");
+        }
+        
+        config.build()
+    } else {
+        // Keep current scalar build configuration
+        println!("cargo:warning=Building scalar-compatible version");
+        config.build()
+    };
 
     add_link_search_path(&out.join("build")).unwrap();
 
     println!("cargo:rustc-link-search=native={}", destination.display());
+    
+    // Link DLL libraries
     if cfg!(feature = "intel-sycl") {
         println!("cargo:rustc-link-lib=whisper");
         println!("cargo:rustc-link-lib=ggml");
         println!("cargo:rustc-link-lib=ggml-base");
         println!("cargo:rustc-link-lib=ggml-cpu");
     } else {
-        println!("cargo:rustc-link-lib=static=whisper");
-        println!("cargo:rustc-link-lib=static=ggml");
-        println!("cargo:rustc-link-lib=static=ggml-base");
-        println!("cargo:rustc-link-lib=static=ggml-cpu");
+        println!("cargo:rustc-link-lib=whisper");
+        println!("cargo:rustc-link-lib=ggml");
+        println!("cargo:rustc-link-lib=ggml-base");
+        println!("cargo:rustc-link-lib=ggml-cpu");
+    }
+    
+    // Copy DLLs to a known location for distribution
+    if cfg!(target_os = "windows") {
+        let dll_dir = out.join("dll");
+        std::fs::create_dir_all(&dll_dir).unwrap();
+        
+        let build_type = env::var("WHISPER_BUILD_TYPE").unwrap_or_else(|_| "scalar".to_string());
+        let dll_suffix = if build_type == "avx" { "_avx" } else { "_scalar" };
+        
+        // Look for DLLs in multiple possible locations
+        let search_dirs = vec![
+            destination.join("bin"),
+            destination.join("lib"), 
+            destination.join("Release"),
+            destination.join("Release/bin"),
+            destination.join("Release/lib"),
+        ];
+        
+        let mut found_dlls = false;
+        for search_dir in &search_dirs {
+            if search_dir.exists() {
+                println!("cargo:warning=Searching for DLLs in: {}", search_dir.display());
+                for entry in std::fs::read_dir(search_dir).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
+                    let entry = match entry {
+                        Ok(e) => e,
+                        Err(_) => continue,
+                    };
+                    let path = entry.path();
+                    if let Some(ext) = path.extension() {
+                        if ext == "dll" {
+                            found_dlls = true;
+                            if let Some(stem) = path.file_stem() {
+                                let new_name = format!("{}{}.dll", stem.to_string_lossy(), dll_suffix);
+                                let dst = dll_dir.join(&new_name);
+                                std::fs::copy(&path, &dst).unwrap_or_else(|e| {
+                                    println!("cargo:warning=Failed to copy {} to {}: {}", 
+                                        path.display(), dst.display(), e);
+                                    0
+                                });
+                                println!("cargo:warning=Copied DLL: {} -> {}", 
+                                    path.display(), dst.display());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if !found_dlls {
+            println!("cargo:warning=No DLL files found! BUILD_SHARED_LIBS may not be working.");
+            println!("cargo:warning=CMake build directory: {}", destination.display());
+            
+            // List all files in destination to debug
+            if destination.exists() {
+                println!("cargo:warning=Files in build destination:");
+                for entry in std::fs::read_dir(&destination).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
+                    if let Ok(entry) = entry {
+                        println!("cargo:warning=  {}", entry.path().display());
+                    }
+                }
+            }
+        }
+        
+        println!("cargo:rustc-env=WHISPER_DLL_DIR={}", dll_dir.display());
     }
     if cfg!(target_os = "macos") || cfg!(feature = "openblas") {
         println!("cargo:rustc-link-lib=static=ggml-blas");

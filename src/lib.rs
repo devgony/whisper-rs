@@ -76,3 +76,8 @@ pub fn install_logging_hooks() {
     crate::whisper_logging_hook::install_whisper_logging_hook();
     crate::ggml_logging_hook::install_ggml_logging_hook();
 }
+
+/// Check if the current CPU supports AVX instructions
+pub fn cpu_supports_avx() -> bool {
+    whisper_rs_sys::has_avx_support()
+}

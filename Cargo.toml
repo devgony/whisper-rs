@@ -35,6 +35,8 @@ metal = ["whisper-rs-sys/metal", "_gpu"]
 vulkan = ["whisper-rs-sys/vulkan", "_gpu", "dep:libc"]
 openmp = ["whisper-rs-sys/openmp"]
 intel-sycl = ["whisper-rs-sys/intel-sycl", "_gpu"]
+avx-build = ["whisper-rs-sys/avx-build"]
+scalar-build = ["whisper-rs-sys/scalar-build"]
 _gpu = []
 test-with-tiny-model = []
 

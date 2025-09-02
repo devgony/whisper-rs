@@ -36,6 +36,12 @@ vulkan = []
 force-debug = []
 openmp = []
 intel-sycl = []
+avx-build = []
+scalar-build = []
+
+[dependencies]
+raw-cpuid = "11.0"
+libloading = "0.8"
 
 [build-dependencies]
 cmake = "0.1"
